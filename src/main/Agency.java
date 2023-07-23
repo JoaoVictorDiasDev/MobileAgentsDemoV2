@@ -2,6 +2,7 @@ package main;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.rmi.AlreadyBoundException;
@@ -17,7 +18,6 @@ import java.util.Optional;
 import static main.Util.*;
 
 public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
-    // List de agentes que estão atualmente associados com essa agência
     private final LinkedList<Agent> agentsList;
     public final String agencyName;
 
@@ -25,8 +25,7 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
     public final String host;
     private final INameServer nameServer;
 
-    private Registry registryNameServer;
-    private Registry registryAgencyServer;
+    private final Registry agencyRegistry;
 
     public Agency(String agencyName, String host, int listeningPort) throws RemoteException, NotBoundException, AlreadyBoundException {
         super();
@@ -37,41 +36,28 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         this.listeningPort = listeningPort;
         this.host = host;
 
-        registryNameServer = LocateRegistry.getRegistry(nameServerHost, nameServerPort);
+        Registry registryNameServer = LocateRegistry.getRegistry(nameServerHost, nameServerPort);
         nameServer = (INameServer) registryNameServer.lookup("nameServer");
+        agencyRegistry = LocateRegistry.getRegistry(agencyServerHost, agencyServerPort);
     }
 
     public void addAgent(Agent agent){
-        agent.currentAgency = this;
-        agentsList.addFirst(agent);
-        runAgent(agent);
-        System.out.println("Running Agent");
-    }
-
-    public void runAgent(Agent targetAgent) {
-        var agent = findAgent(targetAgent);
-
-        if(agent != null) {
-            Thread newAgentThread = new Thread(agent);
-            newAgentThread.start();
-        } else throw new RuntimeException();
-        // TODO: Potencialmente criar excecao personalizada aqui
     }
 
     @Override
     public void run (){
-        System.out.println("Running Agency!");
+        System.out.printf("[%s] - Thread iniciada!\n", agencyName);
         var serverSocket = startServerSocket(listeningPort);
 
         Socket s;
         ObjectInputStream in;
         try {
             while (true) {
-                System.out.println("Agency " + agencyName + " started loop");
+                System.out.printf("[%s] - Iniciou espera por novo agente\n", agencyName);
                 s = serverSocket.accept();
-
                 in = new ObjectInputStream(s.getInputStream());
-                addAgent((Agent) in.readObject());
+                var receivedAgent = (Agent) in.readObject();
+                receiveAgent(receivedAgent);
             }
         } catch (IOException e){
             System.out.println("Erro ao aceitar conexao na agency");
@@ -91,22 +77,51 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         }
     }
 
-    public void sendMessage(String msg, Agent receiverAgent) throws NotBoundException, RemoteException {
-        var agency = getAgencyByAgent(receiverAgent);
-        agency.receiveMessage(msg, receiverAgent);
+    public void sendMessage(String msg, String receiverAgentName) throws NotBoundException, RemoteException {
+        var agency = getAgencyByAgent(receiverAgentName);
+        agency.receiveMessage(msg, receiverAgentName);
     }
 
-    public void receiveMessage (String msg, Agent receiverAgent) {
-        var agent = findAgent(receiverAgent);
+    public void receiveMessage (String msg, String receiverAgentName) throws  RemoteException{
+        var agent = findAgentByName(receiverAgentName);
         agent.receiveMessage(msg);
     }
 
-    public Agent findAgent(Agent targetAgent) {
-        Optional<Agent> result = agentsList.stream()
-                .filter(agent -> agent.equals(targetAgent))
-                .findFirst();
-        return result.orElse(null); // Return found Agent or null
+    public void sendAgent (String destinationAgencyName, Agent agent) throws NotBoundException, RemoteException {
+        var agency = (IAgency) agencyRegistry.lookup(destinationAgencyName);
+        try {
+            Socket s = new Socket(agency.getAgencyHost(), agency.getAgencyPort());
+            ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+            out.writeObject(agent);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
+    public void receiveAgent (Agent agent){
+        agent.currentAgencyName = this.agencyName;
+        agentsList.addFirst(agent);
+        Thread newAgentThread = new Thread(agent);
+        newAgentThread.start();
+        System.out.printf("[%s] - Rodando agente: %s\n", this.agencyName, agent.agentName);
+        addAgent(agent);
+    }
+
+    @Override
+    public String getAgencyName() throws RemoteException {
+        return this.agencyName;
+    }
+
+    @Override
+    public String getAgencyHost() throws RemoteException {
+        return this.host;
+    }
+
+    @Override
+    public int getAgencyPort() throws RemoteException {
+        return this.listeningPort;
+    }
+
 
     @Override
     public boolean equals(Object o){
@@ -115,8 +130,15 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         return Objects.equals(agency.agencyName, this.agencyName);
     }
 
-    public Agency getAgencyByAgent(Agent agent) throws NotBoundException, RemoteException {
-        var agency = nameServer.getAgencyByAgent(agent);
-        return (Agency) registryAgencyServer.lookup(agency.agencyName);
+    public Agent findAgentByName(String targetAgentName) {
+        Optional<Agent> result = agentsList.stream()
+                .filter(agent -> agent.agentName.equals(targetAgentName))
+                .findFirst();
+        return result.orElse(null); // Return found Agent or null
+    }
+
+    public IAgency getAgencyByAgent(String agentName) throws NotBoundException, RemoteException {
+        var agencyName = nameServer.getAgencyByAgent(agentName);
+        return (IAgency) agencyRegistry.lookup(agencyName);
     }
 }

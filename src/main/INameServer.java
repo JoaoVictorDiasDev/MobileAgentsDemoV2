@@ -2,8 +2,11 @@ package main;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.util.Map;
 
 public interface INameServer extends Remote {
-    public Agency getAgencyByAgent(Agent agent) throws RemoteException;
-    public void associateAgentWithAgency(Agent agent, Agency agency) throws RemoteException;
+    String getAgencyByAgent(String agentName) throws RemoteException;
+    void associateAgentWithAgency(String agentName, String agencyName) throws RemoteException;
+
+    Map<String, String> getMap() throws RemoteException;
 }

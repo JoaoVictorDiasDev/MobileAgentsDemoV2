@@ -6,19 +6,24 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class NameServer extends UnicastRemoteObject implements INameServer {
-    private Map<Agent, Agency> map = new HashMap<>();
+    private final Map<String, String> map = new HashMap<>();
 
     protected NameServer() throws RemoteException {
         super();
     }
 
     @Override
-    public Agency getAgencyByAgent(Agent agent) {
-        return map.get(agent);
+    public String getAgencyByAgent(String agentName) {
+        return map.get(agentName);
     }
 
     @Override
-    public void associateAgentWithAgency(Agent agent, Agency agency) throws RemoteException {
-        map.put(agent, agency);
+    public void associateAgentWithAgency(String agentName, String agencyName) throws RemoteException {
+        map.put(agentName, agencyName);
+    }
+
+    @Override
+    public Map<String, String> getMap() throws RemoteException {
+        return map;
     }
 }
