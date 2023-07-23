@@ -33,21 +33,28 @@ public class Agent implements Runnable, Serializable {
         System.out.printf("[%s] - finalizou dormir\n", agentName);
     }
 
-//    public void sendMessage(String msg, Agent recieverAgent) throws NotBoundException, RemoteException {
-//        var agency = (IAgency) registryAgencyServer.lookup(currentAgencyName);
-//        agency.sendMessage(msg, recieverAgent);
-//    }
-
     public void receiveMessage(String msg) throws RemoteException, NotBoundException {
         System.out.printf("[%s] - Recebi mensagem: %s\n", agentName, msg);
+
+        var currentAgencyName = nameServer.getMap().get(agentName);
+        var currentAgency = (IAgency) agencyRegistry.lookup(currentAgencyName);
+
         if(msg.contains("migrate-to")) {
             var parts = msg.split(" ");
             var destAgencyName = parts[1];
 
-            var currentAgencyName = nameServer.getMap().get(agentName);
-            var currentAgency = (IAgency) agencyRegistry.lookup(currentAgencyName);
-            currentAgency.sendAgent(agentName, destAgencyName);
 
+            System.out.printf("[%s] - Sendo transferido para agência: %s\n", agentName, destAgencyName);
+            currentAgency.sendAgent(agentName, destAgencyName);
+        }
+
+        if(msg.contains("start-reunion")) {
+            var parts = msg.split(" ");
+            for(int i = 1; i < parts.length; i++) {
+                var msgToSend = String.format("send-message %s - migrate-to %s", parts[i], currentAgencyName);
+                System.out.printf("[%s] - Enviando mensagem: %s\n", agentName, msgToSend);
+                currentAgency.sendMessage(msgToSend);
+            }
         }
     }
 
