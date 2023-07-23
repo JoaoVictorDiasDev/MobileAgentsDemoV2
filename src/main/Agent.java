@@ -1,5 +1,9 @@
 package main;
 
+import main.Interfaces.IAgency;
+import main.Interfaces.INameServer;
+import main.Servers.NameServer;
+
 import java.io.*;
 import java.net.Socket;
 import java.rmi.NotBoundException;
@@ -13,10 +17,14 @@ public class Agent implements Runnable, Serializable {
 
     protected final String agentName;
     public String currentAgencyName;
+    private final INameServer nameServer;
+    private final Registry agencyRegistry;
 
-    public Agent(String name, String currentAgencyName) throws RemoteException {
+    public Agent(String name, String currentAgencyName, INameServer nameServer, Registry agencyRegistry) throws RemoteException {
         this.agentName = name;
         this.currentAgencyName = currentAgencyName;
+        this.nameServer = nameServer;
+        this.agencyRegistry = agencyRegistry;
     }
 
     public void onArrival(){
@@ -30,8 +38,17 @@ public class Agent implements Runnable, Serializable {
 //        agency.sendMessage(msg, recieverAgent);
 //    }
 
-    public void receiveMessage(String msg) {
+    public void receiveMessage(String msg) throws RemoteException, NotBoundException {
         System.out.printf("[%s] - Recebi mensagem: %s\n", agentName, msg);
+        if(msg.contains("migrate-to")) {
+            var parts = msg.split(" ");
+            var destAgencyName = parts[1];
+
+            var currentAgencyName = nameServer.getMap().get(agentName);
+            var currentAgency = (IAgency) agencyRegistry.lookup(currentAgencyName);
+            currentAgency.sendAgent(agentName, destAgencyName);
+
+        }
     }
 
     @Override

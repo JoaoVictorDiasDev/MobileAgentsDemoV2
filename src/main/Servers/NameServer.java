@@ -1,4 +1,6 @@
-package main;
+package main.Servers;
+
+import main.Interfaces.INameServer;
 
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
