@@ -24,7 +24,7 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
     private INameServer nameServer;
     private Registry agencyRegistry;
 
-    private final Map<String, Thread> agentsThreads = new HashMap<>();
+    public final Map<String, Thread> agentsThreads = new HashMap<>();
 
     public static void main(String[] args) throws AlreadyBoundException, NotBoundException, RemoteException, InterruptedException {
         new Agency();
@@ -90,7 +90,6 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
 
     @Override
     public void run (){
-        System.out.printf("[%s] - Thread iniciada!\n", agencyName);
         var serverSocket = startServerSocket(listeningPort);
 
         Socket s;
@@ -136,16 +135,6 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         agent.receiveMessage(msg);
     }
 
-    public void sendAgent (String destinationAgencyName, Agent agent) throws NotBoundException, RemoteException {
-        var agency = (IAgency) agencyRegistry.lookup(destinationAgencyName);
-        try {
-            Socket s = new Socket(agency.getAgencyHost(), agency.getAgencyPort());
-            ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
-            out.writeObject(agent);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public void receiveAgent (Agent agent){
         agent.currentAgencyName = this.agencyName;
@@ -173,6 +162,10 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         return this.listeningPort;
     }
 
+    @Override
+    public Map<String, Thread> getAgentsThreads() throws RemoteException {
+       return agentsThreads;
+    }
 
     @Override
     public boolean equals(Object o){
@@ -188,12 +181,8 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         return result.orElse(null); // Return found Agent or null
     }
 
-    public IAgency getAgencyByAgent(String agentName) throws NotBoundException, RemoteException {
-        var agencyName = nameServer.getAgencyByAgent(agentName);
-        return (IAgency) agencyRegistry.lookup(agencyName);
-    }
-
     public void startAgency() throws AlreadyBoundException, RemoteException {
+        // Imprime cabeçalho
         String message = "Procedimento de criação de agência";
         String separator = "\u001B[1m" + "-".repeat(message.length());
 
@@ -206,6 +195,7 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         System.out.println(separator);
 
 
+        // Pega dados da agência
         Scanner scanner = new Scanner(System.in);
         System.out.println("Digite o IP da agência");
         IP = scanner.nextLine().trim();
@@ -216,6 +206,7 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         System.out.println("Digite o nome da agência");
         agencyName = scanner.nextLine().trim();
 
+        // Registra agência como objeto remoto
         agencyRegistry.bind(agencyName, this);
     }
 
@@ -223,15 +214,19 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         var exitRequested = false;
         var scanner = new Scanner(System.in);
         while (!exitRequested) {
-            System.out.println("Digite um comando (create-agent | send-message | stop-agent):");
+            System.out.println("Digite um comando (create-agent agentName | send-message agentName msg | stop-agent agentName | move-agent agentName agencyName | status | exit):");
             String input = scanner.nextLine().trim();
 
             if(input.contains("create-agent") && verifyInput(input)) {
                 createAgent(input);
             }
 
-            if(input.contains("status") && verifyInput(input)) {
+            if(input.equals("status") && verifyInput(input)) {
                 status();
+            }
+
+            if(input.equals("thread-status") && verifyInput(input)) {
+                threadStatus();
             }
 
             if(input.contains("send-message") && verifyInput(input)) {
@@ -246,45 +241,17 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
                 moveAgent(input);
             }
 
-//            switch (input) {
-//                case "status":
-//                    break;
-//                case input "send-message":
-//                    executarComando2();
-//                    break;
-//                case "stop-agent":
-//                    executarComando2();
-//                    break;
-//                case "sair":
-//                    exitRequested = true;
-//                    break;
-//                default:
-//                    System.out.println("Comando inválido. Tente novamente.");
-//            }
+            if(input.contains("stop-agent") && verifyInput(input)) {
+               stopAgent(input);
+            }
         }
         scanner.close();
     }
 
-    public void createAgent(String input) throws RemoteException {
+    private void stopAgent(String input) throws RemoteException {
         var parts = input.split(" ");
         var agentName = parts[1];
-
-        Agent agent = new Agent(agentName);
-        agent.currentAgencyName = this.agencyName;
-        Thread newAgentThread = new Thread(agent);
-        newAgentThread.start();
-        agentsList.add(agent);
-        nameServer.associateAgentWithAgency(agentName, agencyName);
-        System.out.printf("[%s] - Rodando agente: %s\n", this.agencyName, agent.agentName);
-    }
-
-    public void moveAgent(String input) throws NotBoundException, RemoteException, InterruptedException {
-        // Pega dados do agente e agência envolvidos na transação
-        var parts = input.split(" ");
-        var agentName = parts[1];
-        var agencyName = parts[2];
         var agent = findAgentByName(agentName);
-        var agency = (IAgency) agencyRegistry.lookup(agencyName);
 
         //Para Thread do agente sendo transferido
         agentsThreads.get(agentName).interrupt();
@@ -294,13 +261,58 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         agentsList.remove(agent);
 
         // Atualiza servidor de nomes para refletir nova agência do agente
-        nameServer.associateAgentWithAgency(agentName, agency.getAgencyName());
+        nameServer.removeAgent(agentName);
+    }
+
+    public void createAgent(String input) throws RemoteException {
+        // Pega dados do agente
+        var parts = input.split(" ");
+        var agentName = parts[1];
+
+
+        Agent agent = new Agent(agentName, getAgencyName());
+        Thread newAgentThread = new Thread(agent);
+        newAgentThread.start();
+
+        agentsThreads.put(agentName, newAgentThread);
+        agentsList.add(agent);
+
+
+        nameServer.associateAgentWithAgency(agentName, agencyName);
+        System.out.printf("[%s] - Rodando agente: %s\n", this.agencyName, agent.agentName);
+    }
+
+    public void moveAgent(String input) throws NotBoundException, RemoteException, InterruptedException {
+        // Pega dados do agente e agência envolvidos na transação
+        var parts = input.split(" ");
+        var agentName = parts[1];
+        var destAgencyName = parts[2];
+        var currentAgencyName = nameServer.getAgencyByAgent(agentName);
+        var currentAgency = (IAgency) agencyRegistry.lookup(currentAgencyName);
+
+        // Chama método para transferência na agência que contém o agente transferido
+        currentAgency.sendAgent(agentName, destAgencyName);
+    }
+
+    public void sendAgent (String agentName, String destAgencyName) throws NotBoundException, RemoteException {
+        var agent = findAgentByName(agentName);
+        var destAgency = (IAgency) agencyRegistry.lookup(destAgencyName);
+
+        //Para Thread do agente sendo transferido
+        getAgentsThreads().get(agentName).interrupt();
+        getAgentsThreads().remove(agentName);
+
+        // Remove agente da lista de agentes em execução
+        agentsList.remove(agent);
+
+        // Atualiza servidor de nomes para refletir nova agência do agente
+        nameServer.associateAgentWithAgency(agentName, destAgencyName);
 
         // Conecta com agência de destino e envia agente serializado pela redes
         try {
-            Socket s = new Socket(agency.getAgencyHost(), agency.getAgencyPort());
+            Socket s = new Socket(destAgency.getAgencyHost(), destAgency.getAgencyPort());
             ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
-            out.writeObject(findAgentByName(agentName));
+            out.writeObject(agent);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -323,7 +335,14 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
                 return false;
             }
         }
-
         return true;
+    }
+
+    private void threadStatus() {
+        for (Map.Entry<String, Thread> entry : agentsThreads.entrySet()) {
+            String key = entry.getKey();
+            Thread thread = entry.getValue();
+            System.out.println("Agent: " + key + ", Thread: " + thread);
+        }
     }
 }

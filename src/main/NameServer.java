@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
-import static main.Util.nameServerPort;
 
 public class NameServer extends UnicastRemoteObject implements INameServer {
     private final Map<String, String> map = new HashMap<>();
@@ -29,6 +28,11 @@ public class NameServer extends UnicastRemoteObject implements INameServer {
     @Override
     public void associateAgentWithAgency(String agentName, String agencyName) throws RemoteException {
         map.put(agentName, agencyName);
+    }
+
+    @Override
+    public void removeAgent(String agentName) throws RemoteException {
+        map.remove(agentName);
     }
 
     @Override

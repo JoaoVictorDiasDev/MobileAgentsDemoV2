@@ -3,6 +3,7 @@ package main;
 import java.rmi.NotBoundException;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.util.Map;
 
 public interface IAgency extends Remote {
 
@@ -11,7 +12,8 @@ public interface IAgency extends Remote {
     String getAgencyName() throws RemoteException;
     String getAgencyHost() throws RemoteException;
     int getAgencyPort() throws RemoteException;
-    void sendAgent (String destinationAgencyName, Agent agent) throws NotBoundException, RemoteException;
+    Map<String, Thread> getAgentsThreads() throws RemoteException;
+    void sendAgent (String agentName, String agencyName) throws NotBoundException, RemoteException;
 
 }
 

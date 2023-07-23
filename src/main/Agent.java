@@ -8,17 +8,15 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Objects;
 
-import static main.Util.*;
 
 public class Agent implements Runnable, Serializable {
 
     protected final String agentName;
     public String currentAgencyName;
-    public Registry registryAgencyServer;
 
-    public Agent(String name) throws RemoteException {
+    public Agent(String name, String currentAgencyName) throws RemoteException {
         this.agentName = name;
-        registryAgencyServer = LocateRegistry.getRegistry(agencyServerHost, agencyServerPort);
+        this.currentAgencyName = currentAgencyName;
     }
 
     public void onArrival(){
