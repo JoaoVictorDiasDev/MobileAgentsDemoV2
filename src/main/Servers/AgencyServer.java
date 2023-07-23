@@ -30,6 +30,7 @@ public class AgencyServer {
             int agencyServerPort = Integer.parseInt(scanner.nextLine().trim());
 
             LocateRegistry.createRegistry(agencyServerPort);
+            System.out.println("Servidor de agências criado com sucesso");
             while(true){}
         }
         catch (Exception e)

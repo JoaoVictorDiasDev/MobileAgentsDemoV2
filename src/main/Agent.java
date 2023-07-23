@@ -43,7 +43,6 @@ public class Agent implements Runnable, Serializable {
             var parts = msg.split(" ");
             var destAgencyName = parts[1];
 
-
             System.out.printf("[%s] - Sendo transferido para agência: %s\n", agentName, destAgencyName);
             currentAgency.sendAgent(agentName, destAgencyName);
         }

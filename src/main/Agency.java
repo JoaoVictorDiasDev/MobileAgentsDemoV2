@@ -3,11 +3,13 @@ package main;
 import main.Interfaces.IAgency;
 import main.Interfaces.INameServer;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -29,11 +31,11 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
 
     public final Map<String, Thread> agentsThreads = new HashMap<>();
 
-    public static void main(String[] args) throws AlreadyBoundException, NotBoundException, RemoteException, InterruptedException {
+    public static void main(String[] args) throws AlreadyBoundException, NotBoundException, IOException, InterruptedException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         new Agency();
     }
 
-    public Agency() throws RemoteException, NotBoundException, AlreadyBoundException, InterruptedException {
+    public Agency() throws IOException, NotBoundException, AlreadyBoundException, InterruptedException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         connectToNameServer();
         connectToAgencyServer();
         startAgency();
@@ -212,7 +214,7 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
         agencyRegistry.bind(agencyName, this);
     }
 
-    public void getUserInput() throws NotBoundException, RemoteException, InterruptedException {
+    public void getUserInput() throws NotBoundException, IOException, InterruptedException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         var exitRequested = false;
         var scanner = new Scanner(System.in);
         while (!exitRequested) {
@@ -266,13 +268,19 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
         nameServer.removeAgent(agentName);
     }
 
-    public void createAgent(String input) throws RemoteException {
+    public void createAgent(String input) throws IOException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         // Pega dados do agente
         var parts = input.split(" ");
         var agentName = parts[1];
+        var pathToAgentCode = parts[2];
 
+        // Carrega código a partir do caminho fornecido
+        File agentFile = new File(pathToAgentCode);
+        URLClassLoader classLoader = new URLClassLoader(new URL[]{agentFile.toURI().toURL()});
+        Class<?> agentClass = classLoader.loadClass("main.Agent");
+        Constructor<?> agentClassConstructor = agentClass.getConstructors()[0];
+        Agent agent = (Agent) agentClassConstructor.newInstance(agentName, getAgencyName(), nameServer, agencyRegistry);
 
-        Agent agent = new Agent(agentName, getAgencyName(), nameServer, agencyRegistry);
         Thread newAgentThread = new Thread(agent);
         newAgentThread.start();
 
