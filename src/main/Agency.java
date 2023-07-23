@@ -11,37 +11,81 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.LinkedList;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
-import static main.Util.*;
 
 public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
-    private final LinkedList<Agent> agentsList;
-    public final String agencyName;
+    private final LinkedList<Agent> agentsList = new LinkedList<>();
+    public String agencyName;
 
-    public final int listeningPort;
-    public final String host;
-    private final INameServer nameServer;
+    public int listeningPort;
+    public String IP;
 
-    private final Registry agencyRegistry;
+    private INameServer nameServer;
+    private Registry agencyRegistry;
 
-    public Agency(String agencyName, String host, int listeningPort) throws RemoteException, NotBoundException, AlreadyBoundException {
-        super();
+    private final Map<String, Thread> agentsThreads = new HashMap<>();
 
-        agentsList = new LinkedList<>();
-
-        this.agencyName = agencyName;
-        this.listeningPort = listeningPort;
-        this.host = host;
-
-        Registry registryNameServer = LocateRegistry.getRegistry(nameServerHost, nameServerPort);
-        nameServer = (INameServer) registryNameServer.lookup("nameServer");
-        agencyRegistry = LocateRegistry.getRegistry(agencyServerHost, agencyServerPort);
+    public static void main(String[] args) throws AlreadyBoundException, NotBoundException, RemoteException, InterruptedException {
+        new Agency();
     }
 
-    public void addAgent(Agent agent){
+    public Agency() throws RemoteException, NotBoundException, AlreadyBoundException, InterruptedException {
+        connectToNameServer();
+        connectToAgencyServer();
+        startAgency();
+        startControlThread();
+        getUserInput();
+    }
+
+    private void startControlThread() {
+        Thread newThread = new Thread(this);
+        newThread.start();
+    }
+
+    private void connectToAgencyServer() throws RemoteException {
+        String message = "Conectando ao servidor de agências";
+        String separator = "\u001B[1m" + "-".repeat(message.length());
+
+        String reset = "\u001B[0m";  // Reset all formatting
+        String bold = "\u001B[1m";   // Bold text
+        String green = "\u001B[32m"; // Green text
+
+        System.out.println(separator);
+        System.out.println(bold + green + message + reset);
+        System.out.println(separator);
+
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Digite o IP do servidor de agências");
+        String agencyServerIP = scanner.nextLine().trim();
+
+        System.out.println("Digite a porta do servidor de agências");
+        int agencyServerPort = scanner.nextInt();
+
+        agencyRegistry = LocateRegistry.getRegistry(agencyServerIP, agencyServerPort);
+    }
+
+    private void connectToNameServer() throws RemoteException, NotBoundException {
+        String message = "Conectando ao servidor de nomes";
+        String separator = "\u001B[1m" + "-".repeat(message.length());
+
+        String reset = "\u001B[0m";  // Reset all formatting
+        String bold = "\u001B[1m";   // Bold text
+        String green = "\u001B[32m"; // Green text
+
+        System.out.println(separator);
+        System.out.println(bold + green + message + reset);
+        System.out.println(separator);
+
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Digite o IP do servidor de nomes");
+        String nameServerIP = scanner.nextLine().trim();
+
+        System.out.println("Digite a porta do servidor de nomes");
+        int nameServerPort = scanner.nextInt();
+
+        Registry registryNameServer = LocateRegistry.getRegistry(nameServerIP, nameServerPort);
+        nameServer = (INameServer) registryNameServer.lookup("nameServer");
     }
 
     @Override
@@ -77,9 +121,14 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         }
     }
 
-    public void sendMessage(String msg, String receiverAgentName) throws NotBoundException, RemoteException {
-        var agency = getAgencyByAgent(receiverAgentName);
-        agency.receiveMessage(msg, receiverAgentName);
+    public void sendMessage(String input) throws RemoteException, NotBoundException {
+        var parts = input.split(" ");
+
+        var agentName = parts[1];
+        var msg = parts[2];
+        var agencyName = nameServer.getAgencyByAgent(agentName);
+        var agency = (IAgency) agencyRegistry.lookup(agencyName);
+        agency.receiveMessage(msg, agentName);
     }
 
     public void receiveMessage (String msg, String receiverAgentName) throws  RemoteException{
@@ -103,8 +152,10 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
         agentsList.addFirst(agent);
         Thread newAgentThread = new Thread(agent);
         newAgentThread.start();
+        agentsThreads.put(agent.agentName, newAgentThread);
+
         System.out.printf("[%s] - Rodando agente: %s\n", this.agencyName, agent.agentName);
-        addAgent(agent);
+        agentsList.add(agent);
     }
 
     @Override
@@ -114,7 +165,7 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
 
     @Override
     public String getAgencyHost() throws RemoteException {
-        return this.host;
+        return this.IP;
     }
 
     @Override
@@ -140,5 +191,139 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency{
     public IAgency getAgencyByAgent(String agentName) throws NotBoundException, RemoteException {
         var agencyName = nameServer.getAgencyByAgent(agentName);
         return (IAgency) agencyRegistry.lookup(agencyName);
+    }
+
+    public void startAgency() throws AlreadyBoundException, RemoteException {
+        String message = "Procedimento de criação de agência";
+        String separator = "\u001B[1m" + "-".repeat(message.length());
+
+        String reset = "\u001B[0m";  // Reset all formatting
+        String bold = "\u001B[1m";   // Bold text
+        String green = "\u001B[32m"; // Green text
+
+        System.out.println(separator);
+        System.out.println(bold + green + message + reset);
+        System.out.println(separator);
+
+
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Digite o IP da agência");
+        IP = scanner.nextLine().trim();
+
+        System.out.println("Digite a porta da agência");
+        listeningPort = Integer.parseInt(scanner.nextLine().trim());
+
+        System.out.println("Digite o nome da agência");
+        agencyName = scanner.nextLine().trim();
+
+        agencyRegistry.bind(agencyName, this);
+    }
+
+    public void getUserInput() throws NotBoundException, RemoteException, InterruptedException {
+        var exitRequested = false;
+        var scanner = new Scanner(System.in);
+        while (!exitRequested) {
+            System.out.println("Digite um comando (create-agent | send-message | stop-agent):");
+            String input = scanner.nextLine().trim();
+
+            if(input.contains("create-agent") && verifyInput(input)) {
+                createAgent(input);
+            }
+
+            if(input.contains("status") && verifyInput(input)) {
+                status();
+            }
+
+            if(input.contains("send-message") && verifyInput(input)) {
+                sendMessage(input);
+            }
+
+            if(input.contains("exit")){
+                exitRequested = true;
+            }
+
+            if(input.contains("move-agent") && verifyInput(input)) {
+                moveAgent(input);
+            }
+
+//            switch (input) {
+//                case "status":
+//                    break;
+//                case input "send-message":
+//                    executarComando2();
+//                    break;
+//                case "stop-agent":
+//                    executarComando2();
+//                    break;
+//                case "sair":
+//                    exitRequested = true;
+//                    break;
+//                default:
+//                    System.out.println("Comando inválido. Tente novamente.");
+//            }
+        }
+        scanner.close();
+    }
+
+    public void createAgent(String input) throws RemoteException {
+        var parts = input.split(" ");
+        var agentName = parts[1];
+
+        Agent agent = new Agent(agentName);
+        agent.currentAgencyName = this.agencyName;
+        Thread newAgentThread = new Thread(agent);
+        newAgentThread.start();
+        agentsList.add(agent);
+        nameServer.associateAgentWithAgency(agentName, agencyName);
+        System.out.printf("[%s] - Rodando agente: %s\n", this.agencyName, agent.agentName);
+    }
+
+    public void moveAgent(String input) throws NotBoundException, RemoteException, InterruptedException {
+        // Pega dados do agente e agência envolvidos na transação
+        var parts = input.split(" ");
+        var agentName = parts[1];
+        var agencyName = parts[2];
+        var agent = findAgentByName(agentName);
+        var agency = (IAgency) agencyRegistry.lookup(agencyName);
+
+        //Para Thread do agente sendo transferido
+        agentsThreads.get(agentName).interrupt();
+        agentsThreads.remove(agentName);
+
+        // Remove agente da lista de agentes em execução
+        agentsList.remove(agent);
+
+        // Atualiza servidor de nomes para refletir nova agência do agente
+        nameServer.associateAgentWithAgency(agentName, agency.getAgencyName());
+
+        // Conecta com agência de destino e envia agente serializado pela redes
+        try {
+            Socket s = new Socket(agency.getAgencyHost(), agency.getAgencyPort());
+            ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+            out.writeObject(findAgentByName(agentName));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void status() throws RemoteException {
+        var map = nameServer.getMap();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            System.out.println("Agent: " + key + ", Agency: " + value);
+        }
+    }
+
+    private boolean verifyInput(String input) {
+        if(input.contains("send-message")) {
+            var parts = input.split(" ");
+            if(parts.length != 3) {
+                System.out.println("Formatação incorreta para comando \"send-message\". Tente novamente");
+                return false;
+            }
+        }
+
+        return true;
     }
 }

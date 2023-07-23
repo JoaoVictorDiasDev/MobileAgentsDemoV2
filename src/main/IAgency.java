@@ -6,9 +6,8 @@ import java.rmi.RemoteException;
 
 public interface IAgency extends Remote {
 
-    void sendMessage(String msg, String receiverAgentName) throws NotBoundException, RemoteException;
+    void sendMessage(String input) throws RemoteException, NotBoundException;
     void receiveMessage (String msg, String receiverAgentName) throws RemoteException;
-
     String getAgencyName() throws RemoteException;
     String getAgencyHost() throws RemoteException;
     int getAgencyPort() throws RemoteException;

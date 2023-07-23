@@ -21,10 +21,10 @@ public class Client {
 
     private static final LinkedList<Agency> agencyList = new LinkedList<>();
     private static final LinkedList<Agent> agentList = new LinkedList<>();
-    private static final INameServer nameServer = createNameServer();
+    private static final INameServer nameServer = null;
     private static final Registry agencyRegistry = createAgencyRegistry();
 
-    public static void main(String[] args) throws NotBoundException, RemoteException, AlreadyBoundException {
+    public static void main(String[] args) throws NotBoundException, RemoteException, AlreadyBoundException, InterruptedException {
         Scanner scanner = new Scanner(System.in);
         boolean exitRequested = false;
 
@@ -48,72 +48,12 @@ public class Client {
         moveAgent("A2", "S1");
         System.out.println("-----------------------------------------");
 
-        while (!exitRequested) {
-            System.out.println("Digite um comando (create-agent | send-message | stop-agent):");
-            String input = scanner.nextLine().trim();
-
-            if(input.contains("create-agent") && verifyInput(input)) {
-                createAgent(input);
-            }
-
-            if(input.contains("status") && verifyInput(input)) {
-                status(input);
-            }
-
-            if(input.contains("send-message") && verifyInput(input)) {
-                sendMessage(input);
-            }
-
-            if(input.contains("exit")){
-                exitRequested = true;
-            }
-
-//            switch (input) {
-//                case "status":
-//                    break;
-//                case input "send-message":
-//                    executarComando2();
-//                    break;
-//                case "stop-agent":
-//                    executarComando2();
-//                    break;
-//                case "sair":
-//                    exitRequested = true;
-//                    break;
-//                default:
-//                    System.out.println("Comando inválido. Tente novamente.");
-//            }
-        }
-
-        scanner.close();
-
-
-
     }
 
-    private static void status(String input) throws RemoteException {
-        var map = nameServer.getMap();
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
-            System.out.println("Key: " + key + ", Value: " + value);
-        }
-    }
 
-    private static boolean verifyInput(String input) {
-        if(input.contains("send-message")) {
-            var parts = input.split(" ");
-            if(parts.length != 3) {
-                System.out.println("Formatação incorreta para comando \"send-message\". Tente novamente");
-                return false;
-            }
-        }
 
-        return true;
-    }
-
-    public static void createAgency(String agencyName, String host, int listeningPort) throws NotBoundException, RemoteException, AlreadyBoundException {
-        Agency agency = new Agency(agencyName, host, listeningPort);
+    public static void createAgency(String agencyName, String host, int listeningPort) throws NotBoundException, RemoteException, AlreadyBoundException, InterruptedException {
+        Agency agency = new Agency();
         agencyList.add(agency);
 
         agencyRegistry.bind(agencyName, agency);
@@ -147,21 +87,6 @@ public class Client {
         nameServer.associateAgentWithAgency(agent.agentName, agency.getAgencyName());
     }
 
-    private static INameServer createNameServer() {
-        try
-        {
-            System.out.println("Criando servidor de nomes...");
-            Registry registry = LocateRegistry.createRegistry(nameServerPort);
-            registry.bind("nameServer", new NameServer());
-            System.out.println("Servidor de nomes criado com sucesso...");
-            return (INameServer) registry.lookup("nameServer");
-        }
-        catch (Exception e)
-        {
-            System.out.println("Ocorreu um problema na criação do servidor de Nomes\n"+e.toString());
-        }
-        throw new RuntimeException();
-    }
 
     private static Registry createAgencyRegistry() {
         try
@@ -174,15 +99,5 @@ public class Client {
             System.out.println("Ocorreu um problema na criação do servidor de Nomes\n"+e.toString());
         }
         throw new RuntimeException();
-    }
-
-    private static void sendMessage(String input) throws RemoteException, NotBoundException {
-        var parts = input.split(" ");
-
-        var agentName = parts[1];
-        var msg = parts[2];
-        var agencyName = nameServer.getAgencyByAgent(agentName);
-        var agency = (IAgency) agencyRegistry.lookup(agencyName);
-        agency.sendMessage(msg, agentName);
     }
 }
