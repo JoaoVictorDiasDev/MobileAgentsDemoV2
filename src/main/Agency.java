@@ -41,6 +41,7 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
         startAgency();
         startControlThread();
         getUserInput();
+        stopAgency();
     }
 
     private void startControlThread() {
@@ -218,38 +219,57 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
         var exitRequested = false;
         var scanner = new Scanner(System.in);
         while (!exitRequested) {
-            System.out.println("Digite um comando (create-agent agentName | send-message agentName msg | stop-agent agentName | move-agent agentName agencyName | status | exit):");
-            String input = scanner.nextLine().trim();
+            try {
+                System.out.println("Digite um comando (create-agent agentName | send-message agentName msg | stop-agent agentName | move-agent agentName agencyName | status | exit):");
+                String input = scanner.nextLine().trim();
 
-            if(input.contains("create-agent") && verifyInput(input)) {
-                createAgent(input);
-            }
+                if(input.contains("create-agent") && verifyInput(input)) {
+                    createAgent(input);
+                }
 
-            if(input.equals("status") && verifyInput(input)) {
-                status();
-            }
+                if(input.equals("status") && verifyInput(input)) {
+                    status();
+                }
 
-            if(input.equals("thread-status") && verifyInput(input)) {
-                threadStatus();
-            }
+                if(input.equals("thread-status") && verifyInput(input)) {
+                    threadStatus();
+                }
 
-            if(input.contains("send-message")) {
-                sendMessage(input);
-            }
+                if(input.contains("send-message")) {
+                    sendMessage(input);
+                }
 
-            if(input.contains("exit")){
-                exitRequested = true;
-            }
+                if(input.contains("move-agent") && verifyInput(input)) {
+                    moveAgent(input);
+                }
 
-            if(input.contains("move-agent") && verifyInput(input)) {
-                moveAgent(input);
-            }
+                if(input.contains("stop-agent") && verifyInput(input)) {
+                    stopAgent(input);
+                }
 
-            if(input.contains("stop-agent") && verifyInput(input)) {
-               stopAgent(input);
+                if(input.equals("stop-agency") && verifyInput(input)) {
+                    exitRequested = true;
+                }
+            } catch (Exception e){
+                System.out.println("------- ERRO -------\n" + e.getMessage());
             }
         }
         scanner.close();
+    }
+
+    private void stopAgency() throws RemoteException {
+        System.out.printf("[%s] - Iniciando processo de desligamento da agência\n", getAgencyName());
+        var map = new HashMap<>(agentsThreads);
+        map.forEach((key, value) -> {
+            value.interrupt();
+            agentsThreads.remove(key);
+            try {
+                nameServer.removeAgent(key);
+            } catch (RemoteException e) {
+                throw new RuntimeException(e);
+            }
+            System.out.printf("[%s] - Interrompendo %s e removendo do servidor de nomes\n", agencyName, key);
+        });
     }
 
     private void stopAgent(String input) throws RemoteException {
