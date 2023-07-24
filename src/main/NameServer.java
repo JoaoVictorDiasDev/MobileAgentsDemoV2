@@ -42,12 +42,13 @@ public class NameServer extends UnicastRemoteObject implements INameServer {
     private static void createNameServer() {
         try
         {
+            // Print header
             String message = "Criando servidor de nomes";
             String separator = "\u001B[1m" + "-".repeat(message.length());
 
-            String reset = "\u001B[0m";  // Reset all formatting
-            String bold = "\u001B[1m";   // Bold text
-            String green = "\u001B[32m"; // Green text
+            String reset = "\u001B[0m";
+            String bold = "\u001B[1m";
+            String green = "\u001B[32m";
 
             System.out.println(separator);
             System.out.println(bold + green + message + reset);
@@ -55,9 +56,11 @@ public class NameServer extends UnicastRemoteObject implements INameServer {
 
             Scanner scanner = new Scanner(System.in);
 
+            // Pega porta
             System.out.println("Digite a porta do servidor de nomes");
             int nameServerPort = Integer.parseInt(scanner.nextLine().trim());
 
+            // Criar registry e bind
             Registry registry = LocateRegistry.createRegistry(nameServerPort);
             registry.bind("nameServer", new NameServer());
             System.out.println("Servidor de nomes criado com sucesso!\n");
