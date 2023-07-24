@@ -1,14 +1,8 @@
 package main;
 
-import main.Interfaces.IAgency;
-import main.Interfaces.INameServer;
-import main.Servers.NameServer;
-
 import java.io.*;
-import java.net.Socket;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Objects;
 
@@ -20,7 +14,7 @@ public class Agent implements Runnable, Serializable {
     private final INameServer nameServer;
     private final Registry agencyRegistry;
 
-    public Agent(String name, String currentAgencyName, INameServer nameServer, Registry agencyRegistry) throws RemoteException {
+    public Agent(String name, String currentAgencyName, INameServer nameServer, Registry agencyRegistry) {
         this.agentName = name;
         this.currentAgencyName = currentAgencyName;
         this.nameServer = nameServer;
@@ -29,8 +23,7 @@ public class Agent implements Runnable, Serializable {
 
     public void onArrival(){
         System.out.printf("[%s] - chegou na agência %s\n", agentName, currentAgencyName);
-        try { Thread.sleep(5000); } catch (InterruptedException ie) {};
-        System.out.printf("[%s] - finalizou dormir\n", agentName);
+        System.out.printf("[%s] - Pronto para executar qualquer atividade!\n", agentName);
     }
 
     public void receiveMessage(String msg) throws RemoteException, NotBoundException {

@@ -1,9 +1,7 @@
-package main.Servers;
+package main;
 
 import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
 import java.util.Scanner;
-
 
 public class AgencyServer {
     public static void main(String[] args) {
@@ -35,7 +33,7 @@ public class AgencyServer {
         }
         catch (Exception e)
         {
-            System.out.println("Ocorreu um problema na criação do servidor de agências\n"+e.toString());
+            System.out.println("Ocorreu um problema na criação do servidor de agências\n"+ e);
         }
     }
 }

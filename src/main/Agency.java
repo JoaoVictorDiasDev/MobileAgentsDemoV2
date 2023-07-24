@@ -1,8 +1,5 @@
 package main;
 
-import main.Interfaces.IAgency;
-import main.Interfaces.INameServer;
-
 import java.io.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -31,11 +28,11 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
 
     public final Map<String, Thread> agentsThreads = new HashMap<>();
 
-    public static void main(String[] args) throws AlreadyBoundException, NotBoundException, IOException, InterruptedException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public static void main(String[] args) throws AlreadyBoundException, NotBoundException, IOException {
         new Agency();
     }
 
-    public Agency() throws IOException, NotBoundException, AlreadyBoundException, InterruptedException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public Agency() throws IOException, NotBoundException, AlreadyBoundException {
         connectToNameServer();
         connectToAgencyServer();
         startAgency();
@@ -96,15 +93,18 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
 
     @Override
     public void run (){
+        // Cria serverSocket na porta fornecida pelo usuário
         var serverSocket = startServerSocket(listeningPort);
-
         Socket s;
         ObjectInputStream in;
         try {
             while (true) {
                 System.out.printf("[%s] - Iniciou espera por novo agente\n", agencyName);
+                // Aceita todas as tentativas de conexão na porta
                 s = serverSocket.accept();
+                // Lê objeto enviado pela máquina conectada
                 in = new ObjectInputStream(s.getInputStream());
+                // Converte objeto para Agente
                 var receivedAgent = (Agent) in.readObject();
                 receiveAgent(receivedAgent);
             }
@@ -142,14 +142,17 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
     }
 
     public void receiveAgent (Agent agent){
+        // Configura novo agente
         agent.currentAgencyName = this.agencyName;
         agentsList.addFirst(agent);
+
+        // Cria e executa nova thread para agente
         Thread newAgentThread = new Thread(agent);
         newAgentThread.start();
-        agentsThreads.put(agent.agentName, newAgentThread);
 
+        // Salva mapeamento agente-thread
+        agentsThreads.put(agent.agentName, newAgentThread);
         System.out.printf("[%s] - Rodando agente: %s\n", this.agencyName, agent.agentName);
-        agentsList.add(agent);
     }
 
     @Override
@@ -215,23 +218,39 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
         agencyRegistry.bind(agencyName, this);
     }
 
-    public void getUserInput() throws NotBoundException, IOException, InterruptedException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public void getUserInput() {
         var exitRequested = false;
         var scanner = new Scanner(System.in);
         while (!exitRequested) {
             try {
-                System.out.println("Digite um comando (create-agent agentName | send-message agentName msg | stop-agent agentName | move-agent agentName agencyName | status | exit):");
+                String message = """
+                        Listagem Comandos:
+                        create-agent [agentName]
+                        send-message [agentName] [msg]
+                        move-agent [agentName] [agencyName]
+                        stop-agent [agentName]
+                        stop-agency
+                        status
+                        thread-status""";
+                String separator = "\u001B[1m" + "-".repeat(20);
+                String reset = "\u001B[0m";  // Reset all formatting
+                String bold = "\u001B[1m";   // Bold text
+                String green = "\u001B[32m"; // Green text
+
+                System.out.println(separator);
+                System.out.println(bold + green + message + reset);
+                System.out.println(separator);
                 String input = scanner.nextLine().trim();
 
-                if(input.contains("create-agent") && verifyInput(input)) {
+                if(input.contains("create-agent")) {
                     createAgent(input);
                 }
 
-                if(input.equals("status") && verifyInput(input)) {
+                if(input.equals("status")) {
                     status();
                 }
 
-                if(input.equals("thread-status") && verifyInput(input)) {
+                if(input.equals("thread-status")) {
                     threadStatus();
                 }
 
@@ -239,15 +258,15 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
                     sendMessage(input);
                 }
 
-                if(input.contains("move-agent") && verifyInput(input)) {
+                if(input.contains("move-agent")) {
                     moveAgent(input);
                 }
 
-                if(input.contains("stop-agent") && verifyInput(input)) {
+                if(input.contains("stop-agent")) {
                     stopAgent(input);
                 }
 
-                if(input.equals("stop-agency") && verifyInput(input)) {
+                if(input.equals("stop-agency")) {
                     exitRequested = true;
                 }
             } catch (Exception e){
@@ -288,7 +307,7 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
         nameServer.removeAgent(agentName);
     }
 
-    public void createAgent(String input) throws IOException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+    public void createAgent(String input) throws IOException, ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException {
         // Pega dados do agente
         var parts = input.split(" ");
         var agentName = parts[1];
@@ -301,13 +320,13 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
         Constructor<?> agentClassConstructor = agentClass.getConstructors()[0];
         Agent agent = (Agent) agentClassConstructor.newInstance(agentName, getAgencyName(), nameServer, agencyRegistry);
 
+        // Cria e executa thread para o novo agente
         Thread newAgentThread = new Thread(agent);
         newAgentThread.start();
 
+        // Atualiza atributos de controle
         agentsThreads.put(agentName, newAgentThread);
         agentsList.add(agent);
-
-
         nameServer.associateAgentWithAgency(agentName, agencyName);
         System.out.printf("[%s] - Rodando agente: %s\n", this.agencyName, agent.agentName);
     }
@@ -355,17 +374,6 @@ public class Agency extends UnicastRemoteObject implements Runnable, IAgency {
             String value = entry.getValue();
             System.out.println("Agent: " + key + ", Agency: " + value);
         }
-    }
-
-    private boolean verifyInput(String input) {
-        if(input.contains("send-message")) {
-            var parts = input.split(" ");
-            if(parts.length != 3) {
-                System.out.println("Formatação incorreta para comando \"send-message\". Tente novamente");
-                return false;
-            }
-        }
-        return true;
     }
 
     private void threadStatus() {

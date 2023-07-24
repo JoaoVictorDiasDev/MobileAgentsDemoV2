@@ -1,6 +1,4 @@
-package main.Servers;
-
-import main.Interfaces.INameServer;
+package main;
 
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -9,7 +7,6 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
-
 
 public class NameServer extends UnicastRemoteObject implements INameServer {
     private final Map<String, String> map = new HashMap<>();
@@ -67,7 +64,7 @@ public class NameServer extends UnicastRemoteObject implements INameServer {
         }
         catch (Exception e)
         {
-            System.out.println("Ocorreu um problema na criação do servidor de Nomes\n"+e.toString());
+            System.out.println("Ocorreu um problema na criação do servidor de Nomes\n" + e);
         }
     }
 }

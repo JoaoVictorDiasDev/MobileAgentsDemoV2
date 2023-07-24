@@ -1,4 +1,4 @@
-package main.Interfaces;
+package main;
 
 import java.rmi.NotBoundException;
 import java.rmi.Remote;
